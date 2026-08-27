@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KP NPI IPIP - Validate Printer Information</title>
+    <script src="survey-data.js?v=20260827a"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; color: #333; }
+
+        .nav { background: #003B71; color: white; padding: 12px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .nav h1 { font-size: 16px; font-weight: 600; }
+        .nav button { background: rgba(255,255,255,0.15); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
+        .nav button:hover { background: rgba(255,255,255,0.25); }
+        .nav button.active { background: rgba(255,255,255,0.3); cursor: default; }
+
+        .container { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+        .card { background: white; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 24px; margin-bottom: 20px; }
+        .card h2 { font-size: 18px; margin-bottom: 16px; color: #003B71; border-bottom: 2px solid #003B71; padding-bottom: 8px; }
+        .card h3 { font-size: 15px; margin: 16px 0 8px; color: #2d3748; }
+
+        label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 13px; color: #4a5568; }
+        input[type="text"], select, textarea {
+            width: 100%; padding: 9px 12px; border: 1px solid #cbd5e0; border-radius: 6px;
+            font-size: 14px; margin-bottom: 10px; font-family: inherit;
+        }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #003B71; box-shadow: 0 0 0 3px rgba(0,59,113,0.12); }
+        textarea { resize: vertical; min-height: 60px; }
+
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-primary { background: #003B71; color: white; }
+        .btn-primary:hover { background: #002a54; }
+        .btn-success { background: #38a169; color: white; }
+        .btn-success:hover { background: #2f855a; }
+        .btn-danger { background: #e53e3e; color: white; font-size: 12px; padding: 4px 10px; }
+        .btn-danger:hover { background: #c53030; }
+        .btn-secondary { background: #718096; color: white; }
+        .btn-sm { padding: 6px 12px; font-size: 13px; }
+
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .form-row-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; }
+        .form-group { margin-bottom: 4px; }
+        .form-group input, .form-group select, .form-group textarea { margin-bottom: 0; }
+
+        .section-header { background: #003B71; color: white; padding: 8px 16px; border-radius: 6px 6px 0 0; margin: 16px 0 0; font-size: 14px; font-weight: 600; }
+        .section-body { border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 6px 6px; padding: 16px; margin-bottom: 16px; background: #fafbfc; }
+
+        .dept-entry { border: 2px solid #e2e8f0; border-radius: 10px; padding: 20px; margin-bottom: 16px; background: white; }
+        .dept-entry:hover { border-color: #003B71; }
+        .dept-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .dept-header h3 { margin: 0; color: #003B71; font-size: 16px; }
+
+        .printer-set { border: 1px solid #cbd5e0; border-radius: 8px; padding: 14px; margin-bottom: 12px; background: white; }
+        .printer-set-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .printer-set-header strong { color: #003B71; font-size: 14px; }
+
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .mt-2 { margin-top: 8px; }
+        .mt-4 { margin-top: 16px; }
+        .mb-2 { margin-bottom: 8px; }
+        .text-muted { color: #718096; font-size: 13px; }
+        .hidden { display: none; }
+
+        .toast { position: fixed; bottom: 24px; right: 24px; background: #38a169; color: white; padding: 12px 20px; border-radius: 8px; font-weight: 600; z-index: 999; display: none; max-width: 420px; }
+        .toast-error { background: #e53e3e; }
+
+        .required::after { content: ' *'; color: #e53e3e; }
+        .field-error { border-color: #e53e3e !important; }
+        .autofilled { background: white !important; color: #333 !important; border-left: 4px solid #38a169 !important; }
+
+        .loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; z-index: 1000; }
+        .spinner { width: 44px; height: 44px; border: 4px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { color: white; font-weight: 600; font-size: 15px; }
+
+        .setup-banner { border: 2px solid #90cdf4; background: #ebf8ff; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+
+        @media (max-width: 768px) {
+            .form-row, .form-row-4 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="nav">
+    <h1>KP NPI IPIP - Validate Printer Information</h1>
+    <div style="flex:1"></div>
+    <button onclick="location.href='https://tsparger.github.io/IPIP-Department-Survey/'">Department Survey</button>
+    <button onclick="location.href='https://tsparger.github.io/IPIP-Pharmacy-Survey/'">Pharmacy Survey</button>
+    <button id="nav-survey" class="active" onclick="showView('survey')">Printer Survey</button>
+    <button onclick="location.href='https://tsparger.github.io/IPIP-Survey-Dashboard/'">Dashboard</button>
+    <button id="nav-admin" class="hidden" onclick="showView('admin')">Admin</button>
+</div>
+
+<div class="loading-overlay hidden" id="loading">
+    <div class="spinner"></div>
+    <span class="loading-text" id="loading-text">Loading...</span>
+</div>
+
+<!-- ======================== ADMIN VIEW ======================== -->
+<div id="view-admin" class="container hidden">
+    <div class="card">
+        <h2>Survey Setup</h2>
+        <div class="setup-banner" id="setup-banner">
+            <p class="text-muted mb-2">Paste the Power Automate URLs for this survey. These are stored in your browser only &mdash; for external respondents, paste them into the <code>EMBEDDED_FLOW_URL</code> / <code>EMBEDDED_RESPONSES_URL</code> constants in <code>index.html</code> and redeploy.</p>
+            <label>Submit Printer Survey &mdash; HTTP POST URL</label>
+            <input type="text" id="api-url-submit" placeholder="https://...powerautomate.../triggers/manual/paths/invoke?..." value="" />
+            <label>Get Printer Responses &mdash; HTTP GET URL</label>
+            <input type="text" id="api-url-responses" placeholder="https://...powerautomate.../triggers/manual/paths/invoke?..." value="" />
+            <button class="btn btn-primary btn-sm mt-2" onclick="saveApiUrls()">Save URLs</button>
+            <p id="api-status" class="text-muted mt-2"></p>
+        </div>
+        <div class="flex-between mt-4">
+            <div>
+                <h3 style="margin:0;">Responses</h3>
+                <p class="text-muted">Pulled live from SharePoint via the Get Printer Responses flow.</p>
+            </div>
+            <button class="btn btn-success btn-sm" onclick="exportResponses()">Export Responses (CSV)</button>
+        </div>
+        <p class="text-muted mt-2" id="admin-response-count">Not loaded yet.</p>
+    </div>
+</div>
+
+<!-- ======================== SURVEY VIEW ======================== -->
+<div id="view-survey" class="container">
+
+    <div class="card" id="survey-header-card">
+        <div class="mb-2">
+            <h2 style="border:none;padding:0;">KP NPI IPIP - Validate Printer Information (Form)</h2>
+        </div>
+        <div style="background:#ebf8ff;border:2px solid #90cdf4;color:#2c5282;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:13px;font-weight:600;">
+            Select your Region, Facility, and Pharmacy Department Location &mdash; the address details fill in automatically. When you're finished, click <strong>Submit Survey</strong> at the bottom of the page to send your entry to the team. Your in-progress answers are autosaved in this browser, so you can safely close the tab and finish later &mdash; but nothing is sent until you click Submit.
+        </div>
+        <p style="margin-bottom:16px;">Fields marked with <span style="color:#e53e3e;font-weight:700;">*</span> are required.</p>
+
+        <div class="section-header">Respondent Information</div>
+        <div class="section-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="required">Your Name</label>
+                    <input type="text" id="respondent-name" placeholder="Enter your full name..." oninput="persistActiveDraftDebounced()" />
+                </div>
+                <div class="form-group">
+                    <label>Submission Date/Time</label>
+                    <input type="text" id="submit-datetime" readonly style="background:#edf2f7; color:#718096;" value="Will be recorded on submit" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="survey-departments"></div>
+
+    <div id="survey-add-btn" style="text-align:center; margin: 16px 0;">
+        <button class="btn btn-secondary" onclick="addDepartment()">+ Add Another Pharmacy Department</button>
+    </div>
+
+    <div class="card" id="survey-submit-card">
+        <div style="text-align:right;">
+            <button class="btn btn-success" id="submit-btn" onclick="submitSurvey()" style="padding:14px 40px; font-size:16px;">Submit Survey</button>
+        </div>
+    </div>
+
+    <div class="card hidden" id="success-screen">
+        <div style="text-align:center; padding:24px;">
+            <div style="font-size:48px;">&#9989;</div>
+            <h2 style="border:none; justify-content:center;">Thank you &mdash; your printer information was submitted.</h2>
+            <p class="text-muted" style="font-size:15px;" id="success-details"></p>
+            <button class="btn btn-primary mt-4" onclick="resetSurvey()">Submit Another Pharmacy</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ POWER AUTOMATE INTEGRATION ============
+// Paste the "Submit Printer Survey" flow's HTTP POST URL between the quotes below BEFORE
+// deploying to GitHub Pages. External respondents have empty localStorage, so the Admin
+// screen alone is not enough to make the survey work for them.
+const EMBEDDED_FLOW_URL = '';
+// Paste the "Get Printer Responses" flow's HTTP GET URL between the quotes below so the
+// completion checkmarks in the Pharmacy Department Location dropdown are shared across all
+// users and devices. Leave blank to keep checkmarks per-browser only.
+const EMBEDDED_RESPONSES_URL = '';
+
+let URLS = JSON.parse(localStorage.getItem('printer-flow-urls') || '{}');
+if (EMBEDDED_FLOW_URL) URLS.submit = EMBEDDED_FLOW_URL;
+if (EMBEDDED_RESPONSES_URL) URLS.responses = EMBEDDED_RESPONSES_URL;
+
+function showLoading(msg) {
+    document.getElementById('loading-text').textContent = msg || 'Loading...';
+    document.getElementById('loading').classList.remove('hidden');
+}
+function hideLoading() { document.getElementById('loading').classList.add('hidden'); }
+
+async function flowPost(url, data, timeoutMs) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs || 60000);
+    try {
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+            signal: controller.signal
+        });
+        return await resp.json();
+    } finally { clearTimeout(timeout); }
+}
+async function flowGet(url, timeoutMs) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs || 30000);
+    try {
+        const resp = await fetch(url, { method: 'GET', signal: controller.signal });
+        return await resp.json();
+    } finally { clearTimeout(timeout); }
+}
+function saveApiUrls() {
+    const submit = document.getElementById('api-url-submit').value.trim();
+    if (!submit) { toast('Submit Survey URL is required.', true); return; }
+    const responses = document.getElementById('api-url-responses').value.trim();
+    URLS = { submit, responses };
+    localStorage.setItem('printer-flow-urls', JSON.stringify(URLS));
+    document.getElementById('api-status').innerHTML = '<span style="color:#38a169;font-weight:600;">Saved!</span>';
+    if (responses) syncFromServer();
+}
+
+const TIMEOUT_TOAST = 'The submission is taking longer than expected. Give it a minute, then refresh the page and check whether your entry saved before resubmitting.';
+function describeError(err) {
+    if (!err) return 'Unknown error';
+    if (typeof err === 'string') return err;
+    if (err.error && err.error.message) return err.error.message;
+    if (err.message) return err.message;
+    return JSON.stringify(err);
+}
+function isGatewayTimeout(msg) { return /504|gateway timeout|timed? out/i.test(String(msg||'')); }
+
+// ============ STATE ============
+let state = loadState();
+let surveyDepts = [];
+let serverRows = [];
+
+function defaultState() { return { responses: [] }; }
+function loadState() {
+    try {
+        const s = JSON.parse(localStorage.getItem('printer-survey-state-v3'));
+        if (s && Array.isArray(s.responses)) return s;
+        return defaultState();
+    } catch (e) { return defaultState(); }
+}
+function saveState() { localStorage.setItem('printer-survey-state-v3', JSON.stringify(state)); }
+
+function toast(msg, isError, ms) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.style.display = 'block';
+    t.className = isError ? 'toast toast-error' : 'toast';
+    if (toast._timer) clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => t.style.display = 'none', ms || 3500);
+}
+
+// ============ VIEW SWITCHING ============
+function showView(v) {
+    ['survey','admin'].forEach(id => {
+        const el = document.getElementById('view-' + id);
+        if (el) el.classList.toggle('hidden', id !== v);
+        const btn = document.getElementById('nav-' + id);
+        if (btn) btn.classList.toggle('active', id === v);
+    });
+    if (v === 'survey') renderSurvey();
+}
+function checkAdmin() {
+    const isAdmin = new URLSearchParams(location.search).get('admin') === '1';
+    if (isAdmin) {
+        document.getElementById('nav-admin').classList.remove('hidden');
+        document.getElementById('api-url-submit').value = URLS.submit || '';
+        document.getElementById('api-url-responses').value = URLS.responses || '';
+    }
+}
+
+// ============ COMPLETION TRACKING ============
+function completionKey(region, location, department) { return region + '||' + location + '||' + department; }
+function completedKeys() {
+    const set = new Set();
+    serverRows.forEach(r => {
+        const region = r.Region || r.region, loc = r.Location || r.location, dep = r.Department || r.department;
+        if (region && loc && dep) set.add(completionKey(region, loc, dep));
+    });
+    try {
+        (JSON.parse(localStorage.getItem('printer-survey-completed') || '[]') || []).forEach(k => set.add(k));
+    } catch (e) {}
+    return set;
+}
+function markCompleted(depts) {
+    try {
+        const existing = JSON.parse(localStorage.getItem('printer-survey-completed') || '[]') || [];
+        depts.forEach(d => existing.push(completionKey(d.region, resolveLocation(d), resolveDepartment(d))));
+        localStorage.setItem('printer-survey-completed', JSON.stringify([...new Set(existing)]));
+    } catch (e) {}
+}
+async function syncFromServer() {
+    if (!URLS.responses) return;
+    try {
+        const data = await flowGet(URLS.responses);
+        serverRows = (data && data.responses) || [];
+        const el = document.getElementById('admin-response-count');
+        if (el) el.textContent = serverRows.length + ' printer set rows loaded from SharePoint.';
+        renderSurvey();
+    } catch (e) {
+        const el = document.getElementById('admin-response-count');
+        if (el) el.textContent = 'Could not load responses: ' + describeError(e);
+    }
+}
+
+// ============ EXPORT ============
+function exportResponses() {
+    if (!serverRows.length) { toast('No responses loaded. Save a Get Responses URL first.', true); return; }
+    const cols = ['RespondentName','SubmittedAt','Region','Location','Department','Address','City','State','Zip',
+        'PrinterSet','ZebraPrinterName','ZebraPrinterIP','ReportPrinterName','ReportPrinterIP',
+        'FullComputerName','LabelPaperStock','Comments'];
+    const rows = [cols].concat(serverRows.map(r => cols.map(c => r[c] == null ? '' : r[c])));
+    const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(',')).join('\n');
+    download('printer-survey-responses.csv', csv, 'text/csv');
+}
+function download(name, content, type) {
+    const blob = new Blob([content], { type });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+}
+
+// ============ MODEL ============
+function makeDept() {
+    return {
+        region:'', location:'', locationOther:'', department:'', departmentOther:'',
+        address:'', city:'', state:'', zip:'',
+        printers: [makePrinterSet()]
+    };
+}
+function makePrinterSet() {
+    return { zebraName:'', zebraIp:'', reportName:'', reportIp:'', computerName:'', paperStock:'', comments:'' };
+}
+function resolveLocation(d) { return d.location === '__other__' ? (d.locationOther||'') : (d.location||''); }
+function resolveDepartment(d) { return d.department === '__other__' ? (d.departmentOther||'') : (d.department||''); }
+
+function addDepartment() { surveyDepts.push(makeDept()); renderSurvey(); }
+
+// ============ CASCADE HANDLERS ============
+function handleRegionChange(i, value) {
+    const d = surveyDepts[i];
+    d.region = value;
+    d.location = ''; d.locationOther = '';
+    d.department = ''; d.departmentOther = '';
+    d.address = ''; d.city = ''; d.state = ''; d.zip = '';
+    renderSurvey();
+}
+function handleLocationChange(i, value) {
+    const d = surveyDepts[i];
+    d.location = value;
+    if (value !== '__other__') d.locationOther = '';
+    d.department = ''; d.departmentOther = '';
+    d.address = ''; d.city = ''; d.state = ''; d.zip = '';
+    renderSurvey();
+}
+function handleDepartmentChange(i, value) {
+    const d = surveyDepts[i];
+    d.department = value;
+    if (value !== '__other__') d.departmentOther = '';
+    if (value && value !== '__other__') {
+        const recs = (SURVEY_DATA.pharmacyDepartments[d.region] || {})[d.location] || [];
+        const rec = recs.find(r => r.dept === value);
+        if (rec) {
+            d.address = rec.address || '';
+            d.city = rec.city || '';
+            d.state = rec.state || '';
+            d.zip = rec.zip || '';
+        }
+    }
+    renderSurvey();
+}
+
+// ============ RENDER ============
+function renderSurvey() {
+    if (!surveyDepts.length) surveyDepts = [makeDept()];
+    document.getElementById('survey-departments').innerHTML = surveyDepts.map((d, i) => renderDeptForm(d, i)).join('');
+    persistActiveDraft();
+}
+
+function sd(i, field) { return `surveyDepts[${i}]['${field}']`; }
+function onch(i, field) { return `oninput="${sd(i,field)}=this.value;persistActiveDraftDebounced()"`; }
+
+function renderPrinterSets(d, i) {
+    const sets = d.printers || [];
+    return sets.map((p, pi) => `
+        <div class="printer-set">
+            <div class="printer-set-header">
+                <strong>Printer Set ${pi + 1}</strong>
+                ${sets.length > 1 ? `<button class="btn btn-danger" onclick="surveyDepts[${i}].printers.splice(${pi},1);renderSurvey()">Remove</button>` : ''}
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label class="required">OneLink Zebra (Bin Label) Printer Name</label>
+                    <input type="text" data-req-printer="dept-${i}" value="${esc(p.zebraName)}" oninput="surveyDepts[${i}].printers[${pi}].zebraName=this.value;persistActiveDraftDebounced()" placeholder="Bin label printer name" /></div>
+                <div class="form-group"><label class="required">OneLink Zebra (Bin Label) Printer IP Address</label>
+                    <input type="text" data-req-printer="dept-${i}" value="${esc(p.zebraIp)}" oninput="surveyDepts[${i}].printers[${pi}].zebraIp=this.value;persistActiveDraftDebounced()" placeholder="e.g. 10.20.30.40" /></div>
+            </div>
+            <div class="form-row mt-2">
+                <div class="form-group"><label class="required">Report Printer Name</label>
+                    <input type="text" data-req-printer="dept-${i}" value="${esc(p.reportName)}" oninput="surveyDepts[${i}].printers[${pi}].reportName=this.value;persistActiveDraftDebounced()" placeholder="Report printer name" /></div>
+                <div class="form-group"><label class="required">Report Printer IP Address</label>
+                    <input type="text" data-req-printer="dept-${i}" value="${esc(p.reportIp)}" oninput="surveyDepts[${i}].printers[${pi}].reportIp=this.value;persistActiveDraftDebounced()" placeholder="e.g. 10.20.30.41" /></div>
+            </div>
+            <div class="form-row mt-2">
+                <div class="form-group"><label class="required">Full Computer Name</label>
+                    <input type="text" data-req-printer="dept-${i}" value="${esc(p.computerName)}" oninput="surveyDepts[${i}].printers[${pi}].computerName=this.value;persistActiveDraftDebounced()" placeholder="Fully qualified computer name" /></div>
+                <div class="form-group"><label class="required">Label paper stock info (include dimensions)</label>
+                    <input type="text" data-req-printer="dept-${i}" value="${esc(p.paperStock)}" oninput="surveyDepts[${i}].printers[${pi}].paperStock=this.value;persistActiveDraftDebounced()" placeholder="Stock/part number and label size, e.g. 2 in x 1 in direct thermal" /></div>
+            </div>
+            <div class="form-group mt-2"><label>Comments</label>
+                <textarea oninput="surveyDepts[${i}].printers[${pi}].comments=this.value;persistActiveDraftDebounced()" placeholder="Comments about this printer set (optional)...">${esc(p.comments)}</textarea></div>
+        </div>`).join('') +
+        `<button class="btn btn-secondary btn-sm" onclick="surveyDepts[${i}].printers.push(makePrinterSet());renderSurvey()">+ Add Another Printer Set</button>`;
+}
+
+function renderDeptForm(d, i) {
+    const done = completedKeys();
+    const locs = (d.region && SURVEY_DATA.pharmacyLocations[d.region]) || [];
+    const depts = (d.region && d.location && d.location !== '__other__'
+        && SURVEY_DATA.pharmacyDepartments[d.region]
+        && SURVEY_DATA.pharmacyDepartments[d.region][d.location]) || [];
+    return `
+    <div class="dept-entry">
+        <div class="dept-header">
+            <h3>Pharmacy ${i + 1}</h3>
+            ${surveyDepts.length > 1 ? `<button class="btn btn-danger" onclick="surveyDepts.splice(${i},1);renderSurvey()">Remove Pharmacy</button>` : ''}
+        </div>
+
+        <div class="section-header">Pharmacy Identification</div>
+        <div class="section-body">
+            <div class="form-row">
+                <div class="form-group"><label class="required">Region</label>
+                    <select data-req="dept-${i}" onchange="handleRegionChange(${i}, this.value)">
+                        <option value="">-- Select Region --</option>
+                        ${SURVEY_DATA.regions.map(r => `<option value="${esc(r)}" ${d.region===r?'selected':''}>${esc(r)}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group"><label class="required">Facility</label>
+                    <select data-req="dept-${i}" onchange="handleLocationChange(${i}, this.value)" ${!d.region?'disabled':''}>
+                        <option value="">${d.region ? '-- Select Facility --' : '-- Select Region first --'}</option>
+                        ${locs.map(l => `<option value="${esc(l)}" ${d.location===l?'selected':''}>${esc(l)}</option>`).join('')}
+                        <option value="__other__" ${d.location==='__other__'?'selected':''}>Other (enter manually)</option>
+                    </select>
+                    ${d.location==='__other__' ? `<input type="text" data-req="dept-${i}" value="${esc(d.locationOther)}" oninput="surveyDepts[${i}].locationOther=this.value;persistActiveDraftDebounced()" placeholder="Enter facility name..." style="margin-top:6px;" />` : ''}
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label class="required">Pharmacy Department Location</label>
+                    <select data-req="dept-${i}" onchange="handleDepartmentChange(${i}, this.value)" ${!d.location?'disabled':''}>
+                        <option value="">${d.location ? '-- Select Pharmacy Department Location --' : '-- Select Facility first --'}</option>
+                        ${depts.map(rec => { const pre = done.has(completionKey(d.region, d.location, rec.dept)) ? '✅ ' : ''; return `<option value="${esc(rec.dept)}" ${d.department===rec.dept?'selected':''}>${esc(pre + rec.dept)}</option>`; }).join('')}
+                        <option value="__other__" ${d.department==='__other__'?'selected':''}>Other (enter manually)</option>
+                    </select>
+                    ${d.department==='__other__' ? `<input type="text" data-req="dept-${i}" value="${esc(d.departmentOther)}" oninput="surveyDepts[${i}].departmentOther=this.value;persistActiveDraftDebounced()" placeholder="Enter pharmacy department location..." style="margin-top:6px;" />` : ''}
+                </div>
+                <div class="form-group"></div>
+            </div>
+            <div class="form-row-4">
+                <div class="form-group"><label>Address</label><input type="text" class="${d.address?'autofilled':''}" value="${esc(d.address)}" ${onch(i,'address')} placeholder="Auto-filled (editable)" /></div>
+                <div class="form-group"><label>City</label><input type="text" class="${d.city?'autofilled':''}" value="${esc(d.city)}" ${onch(i,'city')} placeholder="Auto-filled (editable)" /></div>
+                <div class="form-group"><label>State</label><input type="text" class="${d.state?'autofilled':''}" value="${esc(d.state)}" ${onch(i,'state')} placeholder="Auto-filled (editable)" /></div>
+                <div class="form-group"><label>Zip Code</label><input type="text" class="${d.zip?'autofilled':''}" value="${esc(d.zip)}" ${onch(i,'zip')} placeholder="Auto-filled (editable)" /></div>
+            </div>
+        </div>
+
+        <div class="section-header">Printer Information</div>
+        <div class="section-body">
+            <p class="text-muted mb-2">Add one printer set per bin-label printer at this pharmacy department location.</p>
+            ${renderPrinterSets(d, i)}
+        </div>
+    </div>`;
+}
+
+// ============ VALIDATION ============
+function validateSurvey() {
+    let errors = [];
+    const nameInput = document.getElementById('respondent-name');
+    if (!nameInput.value.trim()) {
+        nameInput.classList.add('field-error');
+        errors.push('Your Name is required.');
+    } else {
+        nameInput.classList.remove('field-error');
+    }
+    surveyDepts.forEach((d, i) => {
+        document.querySelectorAll(`[data-req="dept-${i}"]`).forEach(el => {
+            if (!el.value.trim()) {
+                el.classList.add('field-error');
+                errors.push(`Pharmacy ${i+1}: Region, Facility, and Pharmacy Department Location are required.`);
+            } else { el.classList.remove('field-error'); }
+        });
+        document.querySelectorAll(`[data-req-printer="dept-${i}"]`).forEach(el => {
+            if (!el.value.trim()) {
+                el.classList.add('field-error');
+                errors.push(`Pharmacy ${i+1}: All printer fields are required.`);
+            } else { el.classList.remove('field-error'); }
+        });
+    });
+    return [...new Set(errors)];
+}
+
+// ============ SUBMIT ============
+// One SharePoint row per printer set. The survey flattens here so the flow only needs a
+// single Apply to each over `rows`.
+function buildRows(nameVal, submittedAt) {
+    const rows = [];
+    surveyDepts.forEach(d => {
+        const loc = resolveLocation(d), dep = resolveDepartment(d);
+        (d.printers || []).forEach((p, pi) => {
+            rows.push({
+                respondentName: nameVal,
+                submittedAt: submittedAt,
+                region: d.region,
+                location: loc,
+                department: dep,
+                address: d.address, city: d.city, state: d.state, zip: d.zip,
+                printerSet: pi + 1,
+                zebraName: p.zebraName, zebraIp: p.zebraIp,
+                reportName: p.reportName, reportIp: p.reportIp,
+                computerName: p.computerName,
+                paperStock: p.paperStock,
+                comments: p.comments || '',
+                title: `${d.region} - ${loc} - ${dep} - Set ${pi + 1}`,
+                raw: JSON.stringify({ region: d.region, location: loc, department: dep,
+                    address: d.address, city: d.city, state: d.state, zip: d.zip, printer: p })
+            });
+        });
+    });
+    return rows;
+}
+
+async function submitSurvey() {
+    const errors = validateSurvey();
+    if (errors.length) {
+        toast(errors.length === 1 ? errors[0] : `Please fix ${errors.length} required fields before submitting.`, true);
+        const firstError = document.querySelector('.field-error');
+        if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+
+    const now = new Date();
+    const submittedAt = now.toISOString();
+    const nameVal = document.getElementById('respondent-name').value.trim();
+    document.getElementById('submit-datetime').value = now.toLocaleString();
+
+    const rows = buildRows(nameVal, submittedAt);
+    const data = { action: 'submitPrinterSurvey', respondentName: nameVal, submittedAt: submittedAt, rows: rows };
+
+    if (!URLS.submit) {
+        toast('Cannot submit: survey is not configured. Please contact the survey administrator.', true, 6000);
+        return;
+    }
+
+    showLoading('Submitting survey...');
+    document.getElementById('submit-btn').disabled = true;
+    try {
+        const result = await flowPost(URLS.submit, data);
+        if (result && result.success) {
+            state.responses.push(data);
+            saveState();
+            markCompleted(surveyDepts);
+            clearActiveDraft();
+            showSuccessScreen(nameVal, now, surveyDepts.length, rows.length);
+        } else {
+            const raw = describeError(result);
+            toast(isGatewayTimeout(raw) ? TIMEOUT_TOAST : ('Submission failed: ' + raw), true, isGatewayTimeout(raw) ? 11000 : 6000);
+            document.getElementById('submit-btn').disabled = false;
+        }
+    } catch (e) {
+        const raw = describeError(e && (e.message || e));
+        const timeout = isGatewayTimeout(raw) || (e && e.name === 'AbortError');
+        toast(timeout ? TIMEOUT_TOAST : ('Submission error: ' + raw), true, timeout ? 11000 : 6000);
+        document.getElementById('submit-btn').disabled = false;
+    }
+    hideLoading();
+}
+
+function showSuccessScreen(name, date, pharmacyCount, rowCount) {
+    document.getElementById('survey-header-card').classList.add('hidden');
+    document.getElementById('survey-departments').classList.add('hidden');
+    document.getElementById('survey-add-btn').classList.add('hidden');
+    document.getElementById('survey-submit-card').classList.add('hidden');
+    document.getElementById('success-screen').classList.remove('hidden');
+    document.getElementById('success-details').textContent =
+        `${name} submitted ${rowCount} printer set${rowCount === 1 ? '' : 's'} across ${pharmacyCount} pharmacy department location${pharmacyCount === 1 ? '' : 's'} on ${date.toLocaleString()}.`;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetSurvey() {
+    surveyDepts = [makeDept()];
+    document.getElementById('survey-header-card').classList.remove('hidden');
+    document.getElementById('survey-departments').classList.remove('hidden');
+    document.getElementById('survey-add-btn').classList.remove('hidden');
+    document.getElementById('survey-submit-card').classList.remove('hidden');
+    document.getElementById('success-screen').classList.add('hidden');
+    document.getElementById('submit-btn').disabled = false;
+    document.getElementById('submit-datetime').value = 'Will be recorded on submit';
+    renderSurvey();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ============ DRAFT AUTOSAVE ============
+const DRAFT_KEY = 'printer-survey-draft-v3';
+function persistActiveDraft() {
+    try {
+        const nameEl = document.getElementById('respondent-name');
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+            respondentName: nameEl ? nameEl.value : '',
+            departments: surveyDepts
+        }));
+    } catch (e) {}
+}
+function persistActiveDraftDebounced() {
+    clearTimeout(persistActiveDraftDebounced._t);
+    persistActiveDraftDebounced._t = setTimeout(persistActiveDraft, 400);
+}
+function restoreActiveDraft() {
+    try {
+        const draft = JSON.parse(localStorage.getItem(DRAFT_KEY));
+        if (!draft || !Array.isArray(draft.departments) || !draft.departments.length) return false;
+        surveyDepts = draft.departments.map(d => Object.assign(makeDept(), d));
+        surveyDepts.forEach(d => { if (!Array.isArray(d.printers) || !d.printers.length) d.printers = [makePrinterSet()]; });
+        const nameEl = document.getElementById('respondent-name');
+        if (nameEl) nameEl.value = draft.respondentName || '';
+        return true;
+    } catch (e) { return false; }
+}
+function clearActiveDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch (e) {} }
+
+// ============ UTILS ============
+function esc(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ============ INIT ============
+function init() {
+    checkAdmin();
+    restoreActiveDraft();
+    renderSurvey();
+    if (URLS.responses) syncFromServer();
+}
+init();
+</script>
+
+</body>
+</html>
