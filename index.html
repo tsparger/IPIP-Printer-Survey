@@ -179,11 +179,11 @@
 // Paste the "Submit Printer Survey" flow's HTTP POST URL between the quotes below BEFORE
 // deploying to GitHub Pages. External respondents have empty localStorage, so the Admin
 // screen alone is not enough to make the survey work for them.
-const EMBEDDED_FLOW_URL = '';
+const EMBEDDED_FLOW_URL = 'https://997e87e2062feb52af5c332a27e4b4.0d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/25/workflows/6a8c332022d6469184b6e285f14ed105/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=idG9OaljHfv76EloE0wI6FRLtN5JdyAj2Wg93c117PY';
 // Paste the "Get Printer Responses" flow's HTTP GET URL between the quotes below so the
 // completion checkmarks in the Pharmacy Department Location dropdown are shared across all
 // users and devices. Leave blank to keep checkmarks per-browser only.
-const EMBEDDED_RESPONSES_URL = '';
+const EMBEDDED_RESPONSES_URL = 'https://997e87e2062feb52af5c332a27e4b4.0d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/05/workflows/dfacd2232cd548f9884a60072eede9ea/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=jFe2KtEbO_VZNiAefK80EWoU_0J0TdL5Yd71-eXBn9w';
 
 let URLS = JSON.parse(localStorage.getItem('printer-flow-urls') || '{}');
 if (EMBEDDED_FLOW_URL) URLS.submit = EMBEDDED_FLOW_URL;
