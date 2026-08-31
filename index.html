@@ -618,9 +618,19 @@ function reconstructFromServer(region, location, department) {
         (r.Department || '') === department);
     if (!rows.length) return null;
 
-    // SubmittedAt is an ISO string, so a plain string compare finds the newest submission.
-    let latest = '';
-    rows.forEach(r => { const t = String(r.SubmittedAt || ''); if (t > latest) latest = t; });
+    // SubmittedAt may come back as an ISO string or, if the SharePoint column is a
+    // Date/Time type, as "MM/DD/YYYY HH:MM:SS". Comparing those as plain strings picks the
+    // wrong submission across a year boundary ("01/15/2027" sorts before "12/20/2026"), so
+    // compare parsed timestamps and only fall back to string order if parsing fails.
+    let latest = null, latestMs = null;
+    rows.forEach(r => {
+        const raw = String(r.SubmittedAt || '');
+        const parsed = Date.parse(raw);
+        const ms = isNaN(parsed) ? null : parsed;
+        if (latest === null) { latest = raw; latestMs = ms; return; }
+        const newer = (ms !== null && latestMs !== null) ? (ms > latestMs) : (raw > latest);
+        if (newer) { latest = raw; latestMs = ms; }
+    });
     const sel = rows.filter(r => String(r.SubmittedAt || '') === latest)
                     .sort((a, b) => (Number(a.PrinterSet) || 0) - (Number(b.PrinterSet) || 0));
 
