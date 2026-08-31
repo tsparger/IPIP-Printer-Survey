@@ -200,7 +200,7 @@ const EMBEDDED_RESPONSES_URL = 'https://997e87e2062feb52af5c332a27e4b4.0d.enviro
 // Paste the "Upload Printer Photo" flow's HTTP POST URL between the quotes below to enable
 // photo uploads. Leave blank and the photo slots explain that uploads aren't turned on yet;
 // everything else in the survey keeps working.
-const EMBEDDED_UPLOAD_URL = '';
+const EMBEDDED_UPLOAD_URL = 'https://997e87e2062feb52af5c332a27e4b4.0d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/05/workflows/efe9932f744146f18bd1702513c39871/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=11q-LetwnptbNVHESxAxOTKmdrZXTGotzuew7xX0aHE';
 
 let URLS = JSON.parse(localStorage.getItem('printer-flow-urls') || '{}');
 if (EMBEDDED_FLOW_URL) URLS.submit = EMBEDDED_FLOW_URL;
@@ -427,6 +427,16 @@ function blobToBase64(blob) {
     });
 }
 
+// The flow builds its URL by concatenating a site URL with a leading-slash path, so a
+// trailing slash on the site URL yields "//". Spaces in a library name arrive unencoded.
+// Clean both here rather than depending on the flow being edited perfectly.
+function normalizePhotoUrl(u) {
+    let v = String(u == null ? '' : u).trim();
+    if (!v) return '';
+    v = v.replace(/([^:])\/{2,}/g, '$1/');
+    v = v.split(' ').join('%20');
+    return v;
+}
 function safeName(s) { return String(s || '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60); }
 function photoSlotId(i, pi, slot) { return 'photo-' + i + '-' + pi + '-' + slot; }
 
@@ -492,7 +502,7 @@ async function handlePhotoPick(i, pi, slot, input) {
             printerSet: pi + 1, slot: slot
         }, 90000);
 
-        const link = result && (result.url || result.path);
+        const link = normalizePhotoUrl(result && (result.url || result.path));
         if (!result || result.success !== true || !link) throw new Error(describeError(result) || 'Upload failed.');
 
         p[slot + 'PhotoUrl'] = link;
