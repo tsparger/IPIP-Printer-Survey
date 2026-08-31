@@ -73,7 +73,6 @@ Leave both **not required**. A respondent may skip photos.
 {
   "action": "uploadPrinterPhoto",
   "fileName": "NCAL_DRV-HOSPITAL_DRV-1ST-FL-IP-RX-MAIN_Set1_Printer_2026-08-31-1430_Tori-Sparger.jpg",
-  "folderPath": "NCAL/DRV-HOSPITAL",
   "contentType": "image/jpeg",
   "fileContent": "BASE64STRING",
   "region": "NCAL",
@@ -111,13 +110,12 @@ The browser already caps size, but an anonymous endpoint should not trust its ca
 3. **Folder Path**: click the folder picker and choose **IPIP Printer Photos**
 4. **File Name** — Expression:
    ```
-   concat(triggerBody()?['folderPath'], '/', triggerBody()?['fileName'])
+   triggerBody()?['fileName']
    ```
 
-   Putting the subfolder in **File Name** rather than Folder Path lets SharePoint create the
-   `Region/Facility` folders on demand. Leave **Folder Path** pointing at the library root.
-   If a photo ever fails with a "folder does not exist" error, fall back to plain
-   `triggerBody()?['fileName']` and everything lands flat in the library instead.
+   The survey builds a self-describing name
+   (`Region_Facility_Department_SetN_Slot_YYYY-MM-DD-HHMM_Respondent.jpg`), so sorting the
+   library by name groups photos by region, then facility, then department.
 5. **File Content** — Expression:
    ```
    base64ToBinary(triggerBody()?['fileContent'])

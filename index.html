@@ -461,10 +461,6 @@ function photoFileName(d, pi, slot) {
     return parts.join('_') + '.jpg';
 }
 
-// Region/Facility, used by the flow as a subfolder under the photo library.
-function photoFolderPath(d) {
-    return (safeName(d.region, 10) || 'REGION') + '/' + (safeName(resolveLocation(d), 40) || 'FACILITY');
-}
 function photoSlotId(i, pi, slot) { return 'photo-' + i + '-' + pi + '-' + slot; }
 
 function renderPhotoSlot(d, i, pi, slot) {
@@ -517,12 +513,10 @@ async function handlePhotoPick(i, pi, slot, input) {
         if (blob.size > PHOTO_MAX_BYTES) throw new Error('That photo is still too large after compression. Try a smaller one.');
         const base64 = await blobToBase64(blob);
         const fileName = photoFileName(d, pi, slot);
-        const folderPath = photoFolderPath(d);
 
         const result = await flowPost(URLS.upload, {
             action: 'uploadPrinterPhoto',
             fileName: fileName,
-            folderPath: folderPath,
             contentType: 'image/jpeg',
             fileContent: base64,
             region: d.region, location: resolveLocation(d), department: resolveDepartment(d),
