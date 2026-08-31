@@ -383,8 +383,8 @@ const PHOTO_QUALITY = 0.72;      // JPEG quality
 const PHOTO_MAX_BYTES = 1500000; // reject anything still this big after compression
 
 const PHOTO_SLOTS = {
-    printer: { label: 'Photo of printer', hint: 'Show the printer with its name plate / asset tag if you can.' },
-    label:   { label: 'Photo of label stock', hint: 'Show the label roll or a sample label, including the box or part number.' }
+    printer: { label: 'Photo of printer', hint: 'Take a photo or choose an existing one. Show the printer with its name plate / asset tag if you can.' },
+    label:   { label: 'Photo of label stock', hint: 'Take a photo or choose an existing one. Show the label roll or a sample label, including the box or part number.' }
 };
 
 // Downscale in a canvas before upload. A raw phone photo is 3-5MB; this lands around
@@ -461,7 +461,7 @@ function renderPhotoSlot(d, i, pi, slot) {
     } else {
         body = (err ? '<div class="photo-err">' + esc(err) + '</div>' : '')
             + '<div class="photo-name">' + esc(cfg.hint) + '</div>'
-            + '<input type="file" accept="image/*" capture="environment" onchange="handlePhotoPick(' + i + ',' + pi + ',&quot;' + slot + '&quot;,this)" />';
+            + '<input type="file" accept="image/*" onchange="handlePhotoPick(' + i + ',' + pi + ',&quot;' + slot + '&quot;,this)" />';
     }
     return '<label>' + esc(cfg.label) + '</label>' + body;
 }

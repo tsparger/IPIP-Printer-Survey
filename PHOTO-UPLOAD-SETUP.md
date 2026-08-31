@@ -1,7 +1,7 @@
 # Printer photo uploads — setup
 
 Adds two photo slots to every printer set: **Photo of printer** and **Photo of label stock**.
-On a phone the control opens the camera directly.
+On a phone the control offers Take Photo, Photo Library, or Browse Files.
 
 Nothing appears in the survey until Part 3 is done and the URL is pasted in — the photo slots
 are hidden while the upload flow URL is blank, so a live respondent never sees a control that
@@ -202,7 +202,7 @@ the constant blank and the survey behaves exactly as it does today.
 ## Part 7 — Test
 
 1. Open the survey on a phone. Pick a region, facility, and department.
-2. Tap **Photo of printer** — the camera should open directly.
+2. Tap **Photo of printer** — you should get a chooser offering Take Photo, Photo Library, and Browse Files. Try both taking a new photo and picking an existing one.
 3. Take a photo. Within a few seconds you should see a thumbnail, a green **Uploaded**, and a
    **Remove** button.
 4. Check **IPIP Printer Photos** — a JPEG named
