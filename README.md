@@ -12,7 +12,8 @@ pharmacy department location.
 | --- | --- |
 | `index.html` | The whole survey — form, validation, draft autosave, Power Automate submit |
 | `survey-data.js` | Region / Facility / Pharmacy Department Location list + addresses |
-| `POWER-AUTOMATE-SETUP.md` | Step-by-step build of the SharePoint list and the two flows |
+| `POWER-AUTOMATE-SETUP.md` | Step-by-step build of the SharePoint list and the two core flows |
+| `PHOTO-UPLOAD-SETUP.md` | Optional: photo uploads (document library + a third flow) |
 
 ## Questions asked
 
@@ -25,6 +26,7 @@ Per pharmacy department location, one or more **printer sets**. Each set capture
 5. Full Computer Name
 6. Label paper stock info (include dimensions)
 7. Comments (optional)
+8. Photo of printer + photo of label stock (optional; hidden until photo uploads are configured)
 
 Region, Facility, and Pharmacy Department Location are picked from dropdowns; Address /
 City / State / Zip auto-fill from the selection and stay editable.
@@ -37,6 +39,7 @@ City / State / Zip auto-fill from the selection and stay editable.
 4. Commit and push — GitHub Pages redeploys automatically.
 5. Paste the Get Responses URL into the dashboard's **Settings → Printer Survey** field,
    or set `defaultUrl` on the `printer` entry in the dashboard's `SURVEYS` config.
+6. Optional: enable photo uploads — see [PHOTO-UPLOAD-SETUP.md](PHOTO-UPLOAD-SETUP.md).
 
 Append `?admin=1` to the survey URL to reveal the Admin tab, where the same two URLs can
 be set for your browser only (useful for testing before you hardcode them).

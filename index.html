@@ -77,8 +77,18 @@
 
         .setup-banner { border: 2px solid #90cdf4; background: #ebf8ff; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
 
+        .photo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+        .photo-slot { border: 1px dashed #cbd5e0; border-radius: 8px; padding: 10px; background: #fafbfc; }
+        .photo-slot img { max-width: 100%; max-height: 140px; border-radius: 6px; display: block; margin-bottom: 6px; border: 1px solid #e2e8f0; }
+        .photo-slot input[type="file"] { font-size: 12px; padding: 6px; margin-bottom: 0; background: white; }
+        .photo-name { font-size: 11px; color: #718096; word-break: break-all; margin-bottom: 6px; }
+        .photo-done { color: #276749; font-weight: 600; font-size: 12px; }
+        .photo-err { color: #c53030; font-weight: 600; font-size: 12px; }
+        .photo-busy { color: #2c5282; font-weight: 600; font-size: 12px; }
+        .photo-privacy { background: #fffbeb; border: 1px solid #f6ad55; color: #975a16; border-radius: 6px; padding: 8px 12px; font-size: 12px; font-weight: 600; margin-top: 10px; }
+
         @media (max-width: 768px) {
-            .form-row, .form-row-4 { grid-template-columns: 1fr; }
+            .form-row, .form-row-4, .photo-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -109,6 +119,8 @@
             <input type="text" id="api-url-submit" placeholder="https://...powerautomate.../triggers/manual/paths/invoke?..." value="" />
             <label>Get Printer Responses &mdash; HTTP GET URL</label>
             <input type="text" id="api-url-responses" placeholder="https://...powerautomate.../triggers/manual/paths/invoke?..." value="" />
+            <label>Upload Printer Photo &mdash; HTTP POST URL</label>
+            <input type="text" id="api-url-upload" placeholder="https://...powerautomate.../triggers/manual/paths/invoke?..." value="" />
             <button class="btn btn-primary btn-sm mt-2" onclick="saveApiUrls()">Save URLs</button>
             <p id="api-status" class="text-muted mt-2"></p>
         </div>
@@ -185,9 +197,15 @@ const EMBEDDED_FLOW_URL = 'https://997e87e2062feb52af5c332a27e4b4.0d.environment
 // users and devices. Leave blank to keep checkmarks per-browser only.
 const EMBEDDED_RESPONSES_URL = 'https://997e87e2062feb52af5c332a27e4b4.0d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/05/workflows/dfacd2232cd548f9884a60072eede9ea/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=jFe2KtEbO_VZNiAefK80EWoU_0J0TdL5Yd71-eXBn9w';
 
+// Paste the "Upload Printer Photo" flow's HTTP POST URL between the quotes below to enable
+// photo uploads. Leave blank and the photo slots explain that uploads aren't turned on yet;
+// everything else in the survey keeps working.
+const EMBEDDED_UPLOAD_URL = '';
+
 let URLS = JSON.parse(localStorage.getItem('printer-flow-urls') || '{}');
 if (EMBEDDED_FLOW_URL) URLS.submit = EMBEDDED_FLOW_URL;
 if (EMBEDDED_RESPONSES_URL) URLS.responses = EMBEDDED_RESPONSES_URL;
+if (EMBEDDED_UPLOAD_URL) URLS.upload = EMBEDDED_UPLOAD_URL;
 
 function showLoading(msg) {
     document.getElementById('loading-text').textContent = msg || 'Loading...';
@@ -220,7 +238,9 @@ function saveApiUrls() {
     const submit = document.getElementById('api-url-submit').value.trim();
     if (!submit) { toast('Submit Survey URL is required.', true); return; }
     const responses = document.getElementById('api-url-responses').value.trim();
-    URLS = { submit, responses };
+    const uploadEl = document.getElementById('api-url-upload');
+    const upload = uploadEl ? uploadEl.value.trim() : '';
+    URLS = { submit, responses, upload };
     localStorage.setItem('printer-flow-urls', JSON.stringify(URLS));
     document.getElementById('api-status').innerHTML = '<span style="color:#38a169;font-weight:600;">Saved!</span>';
     if (responses) syncFromServer();
@@ -275,6 +295,7 @@ function checkAdmin() {
         document.getElementById('nav-admin').classList.remove('hidden');
         document.getElementById('api-url-submit').value = URLS.submit || '';
         document.getElementById('api-url-responses').value = URLS.responses || '';
+        document.getElementById('api-url-upload').value = URLS.upload || '';
     }
 }
 
@@ -317,7 +338,7 @@ function exportResponses() {
     if (!serverRows.length) { toast('No responses loaded. Save a Get Responses URL first.', true); return; }
     const cols = ['RespondentName','SubmittedAt','Region','Location','Department','Address','City','State','Zip',
         'PrinterSet','ZebraPrinterName','ZebraPrinterIP','ReportPrinterName','ReportPrinterIP',
-        'FullComputerName','LabelPaperStock','Comments'];
+        'FullComputerName','LabelPaperStock','Comments','PrinterPhotoUrl','LabelPhotoUrl'];
     const rows = [cols].concat(serverRows.map(r => cols.map(c => r[c] == null ? '' : r[c])));
     const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(',')).join('\n');
     download('printer-survey-responses.csv', csv, 'text/csv');
@@ -336,12 +357,164 @@ function makeDept() {
     };
 }
 function makePrinterSet() {
-    return { zebraName:'', zebraIp:'', reportName:'', reportIp:'', computerName:'', paperStock:'', comments:'' };
+    // Fields prefixed with _ are transient UI state: they are stripped before the draft is
+    // saved and before the row is submitted, so blob: preview URLs never reach localStorage
+    // (which caps around 5MB) or SharePoint.
+    return { zebraName:'', zebraIp:'', reportName:'', reportIp:'', computerName:'', paperStock:'', comments:'',
+             printerPhotoUrl:'', printerPhotoName:'', labelPhotoUrl:'', labelPhotoName:'',
+             _printerPreview:'', _labelPreview:'', _printerState:'', _labelState:'' };
+}
+function cleanSet(p) {
+    const out = {};
+    Object.keys(p).forEach(k => { if (k.charAt(0) !== '_') out[k] = p[k]; });
+    return out;
+}
+function cleanDept(d) {
+    return Object.assign({}, d, { printers: (d.printers || []).map(cleanSet) });
 }
 function resolveLocation(d) { return d.location === '__other__' ? (d.locationOther||'') : (d.location||''); }
 function resolveDepartment(d) { return d.department === '__other__' ? (d.departmentOther||'') : (d.department||''); }
 
 function addDepartment() { surveyDepts.push(makeDept()); renderSurvey(); }
+
+// ============ PHOTO UPLOAD ============
+const PHOTO_MAX_DIM = 1600;      // longest edge after downscaling
+const PHOTO_QUALITY = 0.72;      // JPEG quality
+const PHOTO_MAX_BYTES = 1500000; // reject anything still this big after compression
+
+const PHOTO_SLOTS = {
+    printer: { label: 'Photo of printer', hint: 'Show the printer with its name plate / asset tag if you can.' },
+    label:   { label: 'Photo of label stock', hint: 'Show the label roll or a sample label, including the box or part number.' }
+};
+
+// Downscale in a canvas before upload. A raw phone photo is 3-5MB; this lands around
+// 200-350KB with label text still legible, which keeps the flow well inside its limits.
+function compressImage(file) {
+    return new Promise((resolve, reject) => {
+        const objUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            let w = img.naturalWidth, h = img.naturalHeight;
+            const scale = Math.min(1, PHOTO_MAX_DIM / Math.max(w, h));
+            w = Math.max(1, Math.round(w * scale));
+            h = Math.max(1, Math.round(h * scale));
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            canvas.toBlob(blob => {
+                URL.revokeObjectURL(objUrl);
+                if (!blob) { reject(new Error('Could not process this image.')); return; }
+                resolve(blob);
+            }, 'image/jpeg', PHOTO_QUALITY);
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(objUrl);
+            reject(new Error('Could not read this image. Try a JPG or PNG.'));
+        };
+        img.src = objUrl;
+    });
+}
+
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result).split(',')[1] || '');
+        fr.onerror = () => reject(new Error('Could not read the compressed image.'));
+        fr.readAsDataURL(blob);
+    });
+}
+
+function safeName(s) { return String(s || '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60); }
+function photoSlotId(i, pi, slot) { return 'photo-' + i + '-' + pi + '-' + slot; }
+
+function renderPhotoSlot(d, i, pi, slot) {
+    const p = d.printers[pi];
+    const cfg = PHOTO_SLOTS[slot];
+    const url = p[slot + 'PhotoUrl'];
+    const name = p[slot + 'PhotoName'];
+    const preview = p['_' + slot + 'Preview'];
+    const stateRaw = p['_' + slot + 'State'] || '';
+    const busy = stateRaw === 'busy';
+    const err = stateRaw.indexOf('err:') === 0 ? stateRaw.slice(4) : '';
+
+    let body;
+    if (busy) {
+        body = '<div class="photo-busy">Uploading&hellip;</div>';
+    } else if (url) {
+        body = (preview ? '<img src="' + esc(preview) + '" alt="' + esc(cfg.label) + '" />' : '')
+            + '<div class="photo-done">&#9989; Uploaded</div>'
+            + '<div class="photo-name">' + esc(name) + '</div>'
+            + '<button class="btn btn-danger" onclick="removePhoto(' + i + ',' + pi + ',&quot;' + slot + '&quot;)">Remove</button>';
+    } else {
+        body = (err ? '<div class="photo-err">' + esc(err) + '</div>' : '')
+            + '<div class="photo-name">' + esc(cfg.hint) + '</div>'
+            + '<input type="file" accept="image/*" capture="environment" onchange="handlePhotoPick(' + i + ',' + pi + ',&quot;' + slot + '&quot;,this)" />';
+    }
+    return '<label>' + esc(cfg.label) + '</label>' + body;
+}
+
+function refreshPhotoSlot(i, pi, slot) {
+    // Repaint just this slot so an upload never steals focus from a field being typed in.
+    const el = document.getElementById(photoSlotId(i, pi, slot));
+    if (el) el.innerHTML = renderPhotoSlot(surveyDepts[i], i, pi, slot);
+}
+
+async function handlePhotoPick(i, pi, slot, input) {
+    const file = input && input.files && input.files[0];
+    if (!file) return;
+    const d = surveyDepts[i], p = d.printers[pi];
+
+    if (!URLS.upload) {
+        p['_' + slot + 'State'] = 'err:Photo uploads are not configured yet. Contact the survey administrator.';
+        refreshPhotoSlot(i, pi, slot);
+        return;
+    }
+    p['_' + slot + 'State'] = 'busy';
+    refreshPhotoSlot(i, pi, slot);
+
+    try {
+        const blob = await compressImage(file);
+        if (blob.size > PHOTO_MAX_BYTES) throw new Error('That photo is still too large after compression. Try a smaller one.');
+        const base64 = await blobToBase64(blob);
+        const stamp = Math.random().toString(36).slice(2, 8);
+        const fileName = [safeName(d.region) || 'REGION', safeName(resolveLocation(d)) || 'FACILITY',
+                          safeName(resolveDepartment(d)) || 'DEPT', 'set' + (pi + 1), slot, stamp].join('_') + '.jpg';
+
+        const result = await flowPost(URLS.upload, {
+            action: 'uploadPrinterPhoto',
+            fileName: fileName,
+            contentType: 'image/jpeg',
+            fileContent: base64,
+            region: d.region, location: resolveLocation(d), department: resolveDepartment(d),
+            printerSet: pi + 1, slot: slot
+        }, 90000);
+
+        const link = result && (result.url || result.path);
+        if (!result || result.success !== true || !link) throw new Error(describeError(result) || 'Upload failed.');
+
+        p[slot + 'PhotoUrl'] = link;
+        p[slot + 'PhotoName'] = fileName;
+        p['_' + slot + 'Preview'] = URL.createObjectURL(blob);
+        p['_' + slot + 'State'] = '';
+        persistActiveDraft();
+    } catch (e) {
+        const raw = describeError(e && (e.message || e));
+        p['_' + slot + 'State'] = 'err:' + (isGatewayTimeout(raw) ? 'Upload timed out. Try again.' : raw);
+    }
+    refreshPhotoSlot(i, pi, slot);
+}
+
+function removePhoto(i, pi, slot) {
+    const p = surveyDepts[i].printers[pi];
+    // The file stays in SharePoint; this only detaches it from the submission.
+    p[slot + 'PhotoUrl'] = ''; p[slot + 'PhotoName'] = '';
+    p['_' + slot + 'Preview'] = ''; p['_' + slot + 'State'] = '';
+    persistActiveDraft();
+    refreshPhotoSlot(i, pi, slot);
+}
 
 // ============ CASCADE HANDLERS ============
 function handleRegionChange(i, value) {
@@ -413,6 +586,11 @@ function renderPrinterSets(d, i) {
                 <div class="form-group"><label class="required">Label paper stock info (include dimensions)</label>
                     <input type="text" data-req-printer="dept-${i}" value="${esc(p.paperStock)}" oninput="surveyDepts[${i}].printers[${pi}].paperStock=this.value;persistActiveDraftDebounced()" placeholder="Stock/part number and label size, e.g. 2 in x 1 in direct thermal" /></div>
             </div>
+            ${URLS.upload ? `<div class="photo-grid">
+                <div class="photo-slot" id="${photoSlotId(i, pi, 'printer')}">${renderPhotoSlot(d, i, pi, 'printer')}</div>
+                <div class="photo-slot" id="${photoSlotId(i, pi, 'label')}">${renderPhotoSlot(d, i, pi, 'label')}</div>
+            </div>
+            <div class="photo-privacy">Photograph the printer and label stock only. Do not capture anything showing patient information &mdash; screens, patient labels, paperwork, or people.</div>` : ''}
             <div class="form-group mt-2"><label>Comments</label>
                 <textarea oninput="surveyDepts[${i}].printers[${pi}].comments=this.value;persistActiveDraftDebounced()" placeholder="Comments about this printer set (optional)...">${esc(p.comments)}</textarea></div>
         </div>`).join('') +
@@ -525,9 +703,11 @@ function buildRows(nameVal, submittedAt) {
                 computerName: p.computerName,
                 paperStock: p.paperStock,
                 comments: p.comments || '',
+                printerPhotoUrl: p.printerPhotoUrl || '',
+                labelPhotoUrl: p.labelPhotoUrl || '',
                 title: `${d.region} - ${loc} - ${dep} - Set ${pi + 1}`,
                 raw: JSON.stringify({ region: d.region, location: loc, department: dep,
-                    address: d.address, city: d.city, state: d.state, zip: d.zip, printer: p })
+                    address: d.address, city: d.city, state: d.state, zip: d.zip, printer: cleanSet(p) })
             });
         });
     });
@@ -611,7 +791,7 @@ function persistActiveDraft() {
         const nameEl = document.getElementById('respondent-name');
         localStorage.setItem(DRAFT_KEY, JSON.stringify({
             respondentName: nameEl ? nameEl.value : '',
-            departments: surveyDepts
+            departments: surveyDepts.map(cleanDept)
         }));
     } catch (e) {}
 }
@@ -624,7 +804,11 @@ function restoreActiveDraft() {
         const draft = JSON.parse(localStorage.getItem(DRAFT_KEY));
         if (!draft || !Array.isArray(draft.departments) || !draft.departments.length) return false;
         surveyDepts = draft.departments.map(d => Object.assign(makeDept(), d));
-        surveyDepts.forEach(d => { if (!Array.isArray(d.printers) || !d.printers.length) d.printers = [makePrinterSet()]; });
+        surveyDepts.forEach(d => {
+            if (!Array.isArray(d.printers) || !d.printers.length) d.printers = [makePrinterSet()];
+            // Merge onto a fresh set so drafts saved before photos existed pick up the new fields.
+            d.printers = d.printers.map(p => Object.assign(makePrinterSet(), p));
+        });
         const nameEl = document.getElementById('respondent-name');
         if (nameEl) nameEl.value = draft.respondentName || '';
         return true;
