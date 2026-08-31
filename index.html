@@ -86,6 +86,7 @@
         .photo-err { color: #c53030; font-weight: 600; font-size: 12px; }
         .photo-busy { color: #2c5282; font-weight: 600; font-size: 12px; }
         .photo-privacy { background: #fffbeb; border: 1px solid #f6ad55; color: #975a16; border-radius: 6px; padding: 8px 12px; font-size: 12px; font-weight: 600; margin-top: 10px; }
+        .restored-banner { background: #fffbeb; border: 2px solid #f6ad55; color: #c05621; border-radius: 6px; padding: 10px 14px; margin-bottom: 12px; font-size: 13px; font-weight: 600; }
 
         @media (max-width: 768px) {
             .form-row, .form-row-4, .photo-grid { grid-template-columns: 1fr; }
@@ -179,7 +180,7 @@
             <div style="font-size:48px;">&#9989;</div>
             <h2 style="border:none; justify-content:center;">Thank you &mdash; your printer information was submitted.</h2>
             <p class="text-muted" style="font-size:15px;" id="success-details"></p>
-            <button class="btn btn-primary mt-4" onclick="resetSurvey()">Submit Another Pharmacy</button>
+            <button class="btn btn-primary mt-4" onclick="resetSurvey()">Submit Another Printer Set</button>
         </div>
     </div>
 </div>
@@ -577,8 +578,80 @@ function handleDepartmentChange(i, value) {
             d.state = rec.state || '';
             d.zip = rec.zip || '';
         }
+        // Replace only what isn't the respondent's own typing: a blank form, or values
+        // that were themselves pulled back in. Anything hand-typed survives a department
+        // change; previously restored values must not, or they would be resubmitted
+        // against the wrong department.
+        const canReplace = printersAreEmpty(d) || d._reconstructed === true;
+        const prior = canReplace ? reconstructFromServer(d.region, d.location, value) : null;
+        if (prior) {
+            d.printers = prior.printers;
+            if (prior.address) d.address = prior.address;
+            if (prior.city)    d.city    = prior.city;
+            if (prior.state)   d.state   = prior.state;
+            if (prior.zip)     d.zip     = prior.zip;
+            d._reconstructed = true;
+            toast('Loaded the previous submission for this department. Review and update as needed.', false, 6000);
+        } else {
+            if (d._reconstructed) d.printers = [makePrinterSet()];
+            d._reconstructed = false;
+        }
     }
     renderSurvey();
+}
+
+// ============ RESTORE A PRIOR SUBMISSION ============
+// The Get Printer Responses flow returns one row per printer set. When a respondent picks
+// a department that already has rows, rebuild the most recent submission so they can
+// review and correct it instead of retyping.
+function printersAreEmpty(d) {
+    return (d.printers || []).every(p =>
+        !p.zebraName && !p.zebraIp && !p.reportName && !p.reportIp &&
+        !p.computerName && !p.paperStock && !p.comments &&
+        !p.printerPhotoUrl && !p.labelPhotoUrl);
+}
+
+function reconstructFromServer(region, location, department) {
+    const rows = serverRows.filter(r =>
+        (r.Region || '') === region &&
+        (r.Location || '') === location &&
+        (r.Department || '') === department);
+    if (!rows.length) return null;
+
+    // SubmittedAt is an ISO string, so a plain string compare finds the newest submission.
+    let latest = '';
+    rows.forEach(r => { const t = String(r.SubmittedAt || ''); if (t > latest) latest = t; });
+    const sel = rows.filter(r => String(r.SubmittedAt || '') === latest)
+                    .sort((a, b) => (Number(a.PrinterSet) || 0) - (Number(b.PrinterSet) || 0));
+
+    const printers = sel.map(r => {
+        // RawData holds exactly what was typed; the flat columns are the fallback.
+        let raw = null;
+        try { raw = JSON.parse(r.RawData || 'null'); } catch (e) { raw = null; }
+        const src = (raw && raw.printer) ? raw.printer : {};
+        const p = makePrinterSet();
+        p.zebraName    = src.zebraName    || r.ZebraPrinterName  || '';
+        p.zebraIp      = src.zebraIp      || r.ZebraPrinterIP    || '';
+        p.reportName   = src.reportName   || r.ReportPrinterName || '';
+        p.reportIp     = src.reportIp     || r.ReportPrinterIP   || '';
+        p.computerName = src.computerName || r.FullComputerName  || '';
+        p.paperStock   = src.paperStock   || r.LabelPaperStock   || '';
+        p.comments     = src.comments     || r.Comments          || '';
+        // Photos are deliberately not carried over; the respondent re-adds them if needed.
+        return p;
+    });
+
+    const first = sel[0] || {};
+    let firstRaw = null;
+    try { firstRaw = JSON.parse(first.RawData || 'null'); } catch (e) { firstRaw = null; }
+    return {
+        printers: printers,
+        submittedAt: latest,
+        address: (firstRaw && firstRaw.address) || first.Address || '',
+        city:    (firstRaw && firstRaw.city)    || first.City    || '',
+        state:   (firstRaw && firstRaw.state)   || first.State   || '',
+        zip:     (firstRaw && firstRaw.zip)     || first.Zip     || ''
+    };
 }
 
 // ============ RENDER ============
@@ -640,6 +713,7 @@ function renderDeptForm(d, i) {
             <h3>Pharmacy ${i + 1}</h3>
             ${surveyDepts.length > 1 ? `<button class="btn btn-danger" onclick="surveyDepts.splice(${i},1);renderSurvey()">Remove Pharmacy</button>` : ''}
         </div>
+        ${d._reconstructed ? `<div class="restored-banner">Pre-filled from a previous submission &mdash; review every field and update as needed before submitting.${URLS.upload ? ' Photos are not carried over; re-add them if you want them on this submission.' : ''}</div>` : ''}
 
         <div class="section-header">Pharmacy Identification</div>
         <div class="section-body">
@@ -777,6 +851,9 @@ async function submitSurvey() {
             markCompleted(surveyDepts);
             clearActiveDraft();
             showSuccessScreen(nameVal, now, surveyDepts.length, rows.length);
+            // Refresh in the background so the entry just submitted can be pulled back in
+            // straight away, without blocking the success screen.
+            syncFromServer();
         } else {
             const raw = describeError(result);
             toast(isGatewayTimeout(raw) ? TIMEOUT_TOAST : ('Submission failed: ' + raw), true, isGatewayTimeout(raw) ? 11000 : 6000);
