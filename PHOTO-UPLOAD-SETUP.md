@@ -72,7 +72,8 @@ Leave both **not required**. A respondent may skip photos.
 ```json
 {
   "action": "uploadPrinterPhoto",
-  "fileName": "NCAL_DRV-HOSPITAL_DRV-1ST-FL-IP-RX-MAIN_set1_printer_ab12cd.jpg",
+  "fileName": "NCAL_DRV-HOSPITAL_DRV-1ST-FL-IP-RX-MAIN_Set1_Printer_2026-08-31-1430_Tori-Sparger.jpg",
+  "folderPath": "NCAL/DRV-HOSPITAL",
   "contentType": "image/jpeg",
   "fileContent": "BASE64STRING",
   "region": "NCAL",
@@ -110,8 +111,13 @@ The browser already caps size, but an anonymous endpoint should not trust its ca
 3. **Folder Path**: click the folder picker and choose **IPIP Printer Photos**
 4. **File Name** — Expression:
    ```
-   triggerBody()?['fileName']
+   concat(triggerBody()?['folderPath'], '/', triggerBody()?['fileName'])
    ```
+
+   Putting the subfolder in **File Name** rather than Folder Path lets SharePoint create the
+   `Region/Facility` folders on demand. Leave **Folder Path** pointing at the library root.
+   If a photo ever fails with a "folder does not exist" error, fall back to plain
+   `triggerBody()?['fileName']` and everything lands flat in the library instead.
 5. **File Content** — Expression:
    ```
    base64ToBinary(triggerBody()?['fileContent'])

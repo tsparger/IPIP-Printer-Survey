@@ -437,7 +437,34 @@ function normalizePhotoUrl(u) {
     v = v.split(' ').join('%20');
     return v;
 }
-function safeName(s) { return String(s || '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60); }
+function safeName(s, maxLen) { return String(s || '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, maxLen || 60); }
+
+// Region_Facility_Department_SetN_Slot_YYYY-MM-DD-HHMM_Respondent.jpg
+// Sorting the library by name therefore groups by region, then facility, then department,
+// then printer set. The timestamp keeps names unique when a department is resubmitted.
+function photoFileName(d, pi, slot) {
+    const now = new Date();
+    const p2 = n => (n < 10 ? '0' : '') + n;
+    const stamp = now.getFullYear() + '-' + p2(now.getMonth() + 1) + '-' + p2(now.getDate())
+                + '-' + p2(now.getHours()) + p2(now.getMinutes());
+    const nameEl = document.getElementById('respondent-name');
+    const who = safeName(nameEl ? nameEl.value : '', 30);
+    const parts = [
+        safeName(d.region, 10) || 'REGION',
+        safeName(resolveLocation(d), 40) || 'FACILITY',
+        safeName(resolveDepartment(d), 45) || 'DEPARTMENT',
+        'Set' + (pi + 1),
+        slot === 'printer' ? 'Printer' : 'LabelStock',
+        stamp
+    ];
+    if (who) parts.push(who);   // omitted rather than faked if they haven't typed a name yet
+    return parts.join('_') + '.jpg';
+}
+
+// Region/Facility, used by the flow as a subfolder under the photo library.
+function photoFolderPath(d) {
+    return (safeName(d.region, 10) || 'REGION') + '/' + (safeName(resolveLocation(d), 40) || 'FACILITY');
+}
 function photoSlotId(i, pi, slot) { return 'photo-' + i + '-' + pi + '-' + slot; }
 
 function renderPhotoSlot(d, i, pi, slot) {
@@ -489,13 +516,13 @@ async function handlePhotoPick(i, pi, slot, input) {
         const blob = await compressImage(file);
         if (blob.size > PHOTO_MAX_BYTES) throw new Error('That photo is still too large after compression. Try a smaller one.');
         const base64 = await blobToBase64(blob);
-        const stamp = Math.random().toString(36).slice(2, 8);
-        const fileName = [safeName(d.region) || 'REGION', safeName(resolveLocation(d)) || 'FACILITY',
-                          safeName(resolveDepartment(d)) || 'DEPT', 'set' + (pi + 1), slot, stamp].join('_') + '.jpg';
+        const fileName = photoFileName(d, pi, slot);
+        const folderPath = photoFolderPath(d);
 
         const result = await flowPost(URLS.upload, {
             action: 'uploadPrinterPhoto',
             fileName: fileName,
+            folderPath: folderPath,
             contentType: 'image/jpeg',
             fileContent: base64,
             region: d.region, location: resolveLocation(d), department: resolveDepartment(d),
